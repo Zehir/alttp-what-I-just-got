@@ -21,7 +21,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "pnpm install && echo alias ll=\\'ls -al\\' >> /home/node/.bashrc",
+	"postCreateCommand": "pnpm install && echo alias ll=\\'ls -al\\' >> /home/node/.bashrc && git submodule update --init --recursive && pnpm compile",
 
 	// Configure tool-specific properties.
 	// "customizations": {},
