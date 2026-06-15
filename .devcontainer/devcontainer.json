@@ -21,18 +21,9 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "pnpm install && echo alias ll=\\'ls -al\\' >> /home/node/.bashrc",
+	"postCreateCommand": "pnpm install && echo alias ll=\\'ls -al\\' >> /home/node/.bashrc && echo 'export GPG_TTY=$(tty)' >> /home/node/.bashrc",
 
 	// Configure tool-specific properties.
 	// "customizations": {},
-	"remoteUser": "node",
-
-	"appPort": [
-		"3000:3000"
-	],
-	"portsAttributes": {
-		"3000": {
-			"label": "App"
-		}
-	}
+	"remoteUser": "node"
 }

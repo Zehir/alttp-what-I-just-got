@@ -216,9 +216,12 @@ importers:
       '@protobuf-ts/protoc':
         specifier: ^2.11.1
         version: 2.11.1
-      protoc-gen-js:
-        specifier: 3.21.4-4
-        version: 3.21.4-4
+      '@protobuf-ts/runtime':
+        specifier: ^2.11.1
+        version: 2.11.1
+      '@protobuf-ts/runtime-rpc':
+        specifier: ^2.11.1
+        version: 2.11.1
       ts-protoc-gen:
         specifier: ^0.15.0
         version: 0.15.0
@@ -654,10 +657,6 @@ packages:
       vue:
         optional: true
 
-  adm-zip@0.5.10:
-    resolution: {integrity: sha512-x0HvcHqVJNTPk/Bw8JbLWlWoo6Wwnsug0fnYYro1HBrjxZ3G7/AZk7Ahv8JwDe1uIcz8eBqvu86FuF1POiG7vQ==}
-    engines: {node: '>=6.0'}
-
   alien-signals@3.2.1:
     resolution: {integrity: sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g==}
 
@@ -968,10 +967,6 @@ packages:
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
     engines: {node: '>=20'}
-
-  protoc-gen-js@3.21.4-4:
-    resolution: {integrity: sha512-BQUNVNm55pCiFl386SbAjM4D/S70N1jyZPKuTsb8RVibtn+FoiOdHlw4wG8DssvMRZTdI+DIL/WZYN3QBChurg==}
-    hasBin: true
 
   read-package-json-fast@4.0.0:
     resolution: {integrity: sha512-qpt8EwugBWDw2cgE2W+/3oxC+KTez2uSVR8JU9Q36TXPAGCaozfQUs59v4j4GFpWTaw0i6hAZSvOmu1J0uOEUg==}
@@ -1634,8 +1629,6 @@ snapshots:
       typescript: 6.0.3
       vue: 3.5.38(typescript@6.0.3)
 
-  adm-zip@0.5.10: {}
-
   alien-signals@3.2.1: {}
 
   ansi-styles@6.2.3: {}
@@ -1852,10 +1845,6 @@ snapshots:
       source-map-js: 1.2.1
 
   powershell-utils@0.1.0: {}
-
-  protoc-gen-js@3.21.4-4:
-    dependencies:
-      adm-zip: 0.5.10
 
   read-package-json-fast@4.0.0:
     dependencies:

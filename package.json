@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "compile": "protoc --js_out=import_style=commonjs,binary:./lib --ts_out ./lib --ts_opt output_javascript --proto_path ./sni/protos/sni ./sni/protos/sni/*.proto",
+    "compile": "protoc --plugin=protoc-gen-ts=./node_modules/@protobuf-ts/plugin/bin/protoc-gen-ts --ts_out ./lib --ts_opt client_generic --proto_path ./sni/protos/sni ./sni/protos/sni/sni.proto",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
@@ -27,7 +27,8 @@
     "@protobuf-ts/grpcweb-transport": "^2.11.1",
     "@protobuf-ts/plugin": "^2.11.1",
     "@protobuf-ts/protoc": "^2.11.1",
-    "protoc-gen-js": "3.21.4-4",
+    "@protobuf-ts/runtime": "^2.11.1",
+    "@protobuf-ts/runtime-rpc": "^2.11.1",
     "ts-protoc-gen": "^0.15.0",
     "vue": "^3.5.32"
   },
