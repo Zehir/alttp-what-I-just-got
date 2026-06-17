@@ -2,12 +2,11 @@ ARG VARIANT="24-trixie"
 
 FROM mcr.microsoft.com/devcontainers/typescript-node:${VARIANT}
 
-# [Optional] Uncomment this section to install additional OS packages.
+# GPG is used to sign commits. 
+# See https://code.visualstudio.com/remote/advancedcontainers/sharing-git-credentials#_sharing-gpg-keys
+# You probably also need to put "use-agent" in your ~/.gnupg/gpg.conf and "pinentry-program /bin/pinentry-mac" in your ~/.gnupg/gpg-agent.conf on your WSL instance.
+# To list your keys you can use the command (works only in your devcontainer and not the WSL instance):
+# gpg --list-secret-keys --keyid-format=long
 RUN apt-get update && apt-get -y install gnupg
 
-# [Optional] Uncomment if you want to install an additional version of node using nvm
-# ARG EXTRA_NODE_VERSION=10
-# RUN su node -c "source /usr/local/share/nvm/nvm.sh && nvm install ${EXTRA_NODE_VERSION}"
-
-# [Optional] Uncomment if you want to install more global node packages
 RUN su node -c "npm install --location=global pnpm turbo @changesets/cli"
