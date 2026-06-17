@@ -174,9 +174,8 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
                 const onError = (event: Event) => {
                     cleanup();
                     status.value = "ERROR";
-                    errorMessage.value = `Error connecting to USB2SNES server${
-                        event instanceof ErrorEvent && event.message ? `: ${event.message}` : ""
-                    }`;
+                    const message = event instanceof ErrorEvent && event.message ? `: ${event.message}` : "";
+                    errorMessage.value = `Error connecting to USB2SNES server${message}`;
                     reject(new Error(errorMessage.value));
                 };
 
@@ -203,9 +202,8 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
                 nextWs.addEventListener("open", onOpen);
             } catch (error) {
                 status.value = "ERROR";
-                errorMessage.value = `Error creating USB2SNES client${
-                    error instanceof Error && error.message ? `: ${error.message}` : ""
-                }`;
+                const message = error instanceof Error && error.message ? `: ${error.message}` : "";
+                errorMessage.value = `Error creating USB2SNES client${message}`;
                 reject(error instanceof Error ? error : new Error(errorMessage.value));
             }
         }).finally(() => {

@@ -29,10 +29,8 @@ const refreshDevices = async () => {
             return;
         }
 
-        console.log("Available devices:", availableDevices);
-        console.log("Connecting to device:", availableDevices[0]);
         await send(USB2SNES_OPCODES.ATTACH, [String(availableDevices[0])]);
-        
+
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error);
     }
@@ -77,20 +75,14 @@ onMounted(() => {
         {{ status }}
 
         <div ref="scrollContainerRef" style="height: 400px; overflow-y: auto">
-            <div
-                :style="{ height: rowVirtualizer.getTotalSize() + 'px', position: 'relative' }"
-            >
-                <div
-                    v-for="virtualRow in rowVirtualizer.getVirtualItems()"
-                    :key="virtualRow.index"
-                    :style="{
-                        position: 'absolute',
-                        top: virtualRow.start + 'px',
-                        left: 0,
-                        width: '100%',
-                        height: virtualRow.size + 'px',
-                    }"
-                >
+            <div :style="{ height: rowVirtualizer.getTotalSize() + 'px', position: 'relative' }">
+                <div v-for="virtualRow in rowVirtualizer.getVirtualItems()" :key="virtualRow.index" :style="{
+                    position: 'absolute',
+                    top: virtualRow.start + 'px',
+                    left: 0,
+                    width: '100%',
+                    height: virtualRow.size + 'px',
+                }">
                     {{ items[virtualRow.index] }}
                 </div>
             </div>
