@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "compile": "protoc --plugin=protoc-gen-ts=./node_modules/@protobuf-ts/plugin/bin/protoc-gen-ts --ts_out ./lib --ts_opt client_generic --proto_path ./sni/protos/sni ./sni/protos/sni/sni.proto",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
@@ -24,12 +23,8 @@
   },
   "type": "module",
   "dependencies": {
-    "@protobuf-ts/grpcweb-transport": "^2.11.1",
-    "@protobuf-ts/plugin": "^2.11.1",
-    "@protobuf-ts/protoc": "^2.11.1",
-    "@protobuf-ts/runtime": "^2.11.1",
-    "@protobuf-ts/runtime-rpc": "^2.11.1",
-    "ts-protoc-gen": "^0.15.0",
+    "@tanstack/vue-virtual": "^3.13.28",
+    "@vueuse/core": "^14.3.0",
     "vue": "^3.5.32"
   },
   "devDependencies": {
