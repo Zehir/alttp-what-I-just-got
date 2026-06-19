@@ -24,6 +24,7 @@
   "type": "module",
   "dependencies": {
     "@tanstack/vue-virtual": "^3.13.28",
+    "@vueuse/components": "^14.3.0",
     "@vueuse/core": "^14.3.0",
     "vue": "^3.5.32"
   },

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
+import {UseTimeAgo} from "@vueuse/components"
 import {
     USB2SNES_OPCODES,
     USB2SNES_SPACES,
@@ -8,47 +9,129 @@ import {
     type USB2SNESResponse,
 } from "./lib/usb2snes-client";
 
-const { status, data, errorMessage, open, close, send, sendImmediate, ws } = useUSB2SNES(
+import { itemNameById } from "./lib/item-list";
+
+const { status, data, errorMessage, open, close,read, send, sendImmediate, createWatcher, ws } = useUSB2SNES(
     "ws://localhost:23074/",
     { autoConnect: true },
 );
 
-type ResponseHandler = ((data: USB2SNESResponse) => void) | undefined;
+const testValue = ref<String>("");
+
+const positionLink = ref<String>("");
+
+let testduree: number = 0
+let testdureeReset: number = Date.now()
+
+const results = ref<number[]>([]);
+const resultsReset = ref<number[]>([]);
+
+type AlttpItem = {
+    itemID: number;
+    time: number;
+    itemName: string;
+};
+
+const items = ref<AlttpItem[]>([]);
+
+
+const stats = computed(() => {
+    if (results.value.length === 0) return null;
+    const min = Math.min(...results.value);
+    const max = Math.max(...results.value);
+    const average = results.value.reduce((a, b) => a + b, 0) / results.value.length;
+    console.log({ min, max, average, results: results.value });
+    return { min, max, average };
+});
+
+
+const statsReset = computed(() => {
+    if (resultsReset.value.length === 0) return null;
+    const min = Math.min(...resultsReset.value);
+    const max = Math.max(...resultsReset.value);
+    const average = resultsReset.value.reduce((a, b) => a + b, 0) / resultsReset.value.length;
+    console.log({ min, max, average, resultsReset: resultsReset.value });
+    return { min, max, average };
+});
+
 
 
 
 const refreshDevices = async () => {
     errorMessage.value = "";
-
     try {
         await open();
         const availableDevices = await send(USB2SNES_OPCODES.DEVICE_LIST);
-
-        if (!Array.isArray(availableDevices) || availableDevices.length === 0) {
+        const firstDevice = availableDevices[0];
+        if (firstDevice == undefined) {
             errorMessage.value = "No devices found.";
             return;
         }
+        sendImmediate(USB2SNES_OPCODES.ATTACH, [firstDevice]);
 
-        await send(USB2SNES_OPCODES.ATTACH, [String(availableDevices[0])]);
+        
+        /*
+        var watcher = createWatcher(data => {
+            positionLink.value = [
+                data.getUint16(0, true).toString(16).padStart(4, "0"),
+                data.getUint16(2, true).toString(16).padStart(4, "0")
+            ].join(" ")
+        }, 0x7E0020, 4, 1/60)
+        */
+        
+        
+        var watcher = createWatcher(data => {
+
+            var ancilla_list = []
+
+            for (var i = 0; i < 8; i++) {
+                ancilla_list.push(data.getUint8(i))
+            }
+
+            testValue.value = ancilla_list.map(a=>a.toString(16).padStart(2, "0")).join(" ")
+            if (testduree == 0){
+                if (ancilla_list.includes(0x22)){
+                    resultsReset.value.push(Date.now() - testdureeReset)
+                    testduree = Date.now()
+                    testdureeReset = 0
+                }
+            }else {
+                if (!ancilla_list.includes(0x22)){
+                    results.value.push(Date.now() - testduree)
+                    read(0x7E02D8, 2).then((data) => {
+                        items.value.push({
+                            itemID: data.getUint8(0),
+                            itemName: itemNameById[data.getUint8(0)] ?? "Unknown item",
+                            time: Date.now(),
+                        })
+                    })
+
+
+                    
+                    testduree = 0
+                    testdureeReset = Date.now()
+
+                    
+                    setTimeout(() => {
+                        console.log("Reading item name for item ID...")
+                        read(0x7E02D8, 2).then((data) => {
+                            if (items.value[items.value.length - 1] != undefined) {
+                                items.value[items.value.length - 1]!.itemName += " | " + data.getUint8(0).toString(16).padStart(2, "0") + " - " + (itemNameById[data.getUint8(0)] ?? "Unknown item")
+                            }
+                        })
+                        
+                    }, 100)
+
+
+                }
+            }
+            
+        }, 0x7E0C4A, 0x0A, 1/60)
 
     } catch (error) {
         errorMessage.value = error instanceof Error ? error.message : String(error);
     }
 };
-
-type AlttpItem = {
-    index: number;
-    // time: Date
-    item: String;
-};
-
-const items = ref<AlttpItem[]>([
-    {
-        index: 0,
-        //time: new Date(),
-        item: "Item 1",
-    },
-]);
 
 
 const scrollContainerRef = ref<HTMLElement | null>(null);
@@ -59,8 +142,9 @@ const rowVirtualizer = useVirtualizer({
     estimateSize: () => 35,
 });
 
+
 onMounted(() => {
-    void open();
+    refreshDevices();
 });
 </script>
 
@@ -74,6 +158,30 @@ onMounted(() => {
 
         {{ status }}
 
+        <br>
+
+        {{ testValue }}
+
+        <br>
+        {{ stats ? `Min: ${stats.min}ms, Max: ${stats.max}ms, Average: ${stats.average.toFixed(2)}ms` : "No results yet." }}
+
+        <br>
+
+        {{ statsReset ? `Min: ${statsReset.min}ms, Max: ${statsReset.max}ms, Average: ${statsReset.average.toFixed(2)}ms` : "No results yet." }}
+
+        <br>
+
+        {{ positionLink }}
+
+        <br>
+
+        
+        <div v-for="item in items" :key="item.time">
+            <UseTimeAgo v-slot="{ timeAgo }" :time="item.time">
+                {{ timeAgo }} ({{ item.time }}) - {{ item.itemID.toString(16).padStart(2, "0") }} - {{ item.itemName }}
+            </UseTimeAgo>
+        </div>
+        <!--
         <div ref="scrollContainerRef" style="height: 400px; overflow-y: auto">
             <div :style="{ height: rowVirtualizer.getTotalSize() + 'px', position: 'relative' }">
                 <div v-for="virtualRow in rowVirtualizer.getVirtualItems()" :key="virtualRow.index" :style="{
@@ -87,6 +195,7 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+        -->
     </main>
 </template>
 

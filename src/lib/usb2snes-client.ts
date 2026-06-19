@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
+import { computed, onBeforeUnmount, onScopeDispose, ref, shallowRef } from "vue";
 
 export const USB2SNES_KEYS = {
     OPCODE: "Opcode",
@@ -39,8 +39,18 @@ export const USB2SNES_OPCODES = {
 
 export type USB2SNESSpace = (typeof USB2SNES_SPACES)[keyof typeof USB2SNES_SPACES];
 export type USB2SNESOpcode = (typeof USB2SNES_OPCODES)[keyof typeof USB2SNES_OPCODES] | string;
-export type USB2SNESResponse = unknown | ArrayBuffer;
+export type USB2SNESResponse = unknown | DataView;
 export type USB2SNESStatus = "CLOSED" | "CONNECTING" | "OPEN" | "ATTACHED" | "ERROR";
+
+export interface USB2SNESResponseMap {
+    [USB2SNES_OPCODES.DEVICE_LIST]: string[];
+    [USB2SNES_OPCODES.GET_ADDRESS]: DataView;
+    [USB2SNES_OPCODES.APP_VERSION]: string[];
+    [USB2SNES_OPCODES.LIST]: string[];
+}
+
+export type USB2SNESResponseFor<TOpcode extends USB2SNESOpcode> =
+    TOpcode extends keyof USB2SNESResponseMap ? USB2SNESResponseMap[TOpcode] : USB2SNESResponse;
 
 interface CommandPayload {
     opcode: USB2SNESOpcode;
@@ -57,6 +67,23 @@ interface UseUSB2SNESOptions {
     autoConnect?: boolean;
 }
 
+interface USB2SNESWatcher {
+    address: number;
+    length: number;
+    interval: number;
+    callback: (data: DataView) => void;
+    timeoutId: ReturnType<typeof setTimeout> | null;
+    stopped: boolean;
+    running: boolean;
+}
+
+interface UseMemoryOptions {
+    interval?: number;
+    immediate?: boolean;
+}
+
+const MIN_WATCH_INTERVAL = 1000 / 60;
+
 /**
  * Vue composable wrapper for the USB2SNES WebSocket client.
  * Based on https://github.com/djrideout/node-usb2snes-client
@@ -70,7 +97,9 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
     const isAttached = computed(() => status.value === "ATTACHED");
 
     const commands: QueuedCommand[] = [];
+    const watchers = new Map<number, USB2SNESWatcher>();
     let connectPromise: Promise<WebSocket> | null = null;
+    let nextWatcherId = 1;
     let processing = false;
 
     /**
@@ -121,7 +150,7 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
                 result = event.data;
             }
         } else {
-            result = event.data;
+            result = new DataView(event.data);
         }
 
         data.value = result;
@@ -218,6 +247,8 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
      */
     const close = (): void => {
         const nextWs = ws.value;
+        stopAllWatchers();
+
         if (!nextWs) {
             return;
         }
@@ -238,12 +269,12 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
     /**
      * Send a command and resolve with the next response frame.
      */
-    const send = async (
-        opcode: USB2SNESOpcode,
+    const send = async <TOpcode extends USB2SNESOpcode>(
+        opcode: TOpcode,
         operands: string[] = [],
         flags: string[] = [],
         space: USB2SNESSpace = USB2SNES_SPACES.SNES,
-    ): Promise<USB2SNESResponse> => {
+    ): Promise<USB2SNESResponseFor<TOpcode>> => {
         await open();
 
         const response = await new Promise<USB2SNESResponse>((resolve) => {
@@ -258,7 +289,7 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
         });
 
         data.value = response;
-        return response;
+        return response as USB2SNESResponseFor<TOpcode>;
     };
 
     /**
@@ -278,13 +309,146 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
         });
     };
 
-    const read = (address: number, length: number = 1): Promise<ArrayBuffer> => {
+    const read = (address: number, length: number = 1): Promise<DataView> => {
         return send(
             USB2SNES_OPCODES.GET_ADDRESS,
             [(0xf50000 + (address - 0x7e0000)).toString(16), length.toString(16)],
             [],
-            USB2SNES_SPACES.CMD
-        ) as Promise<ArrayBuffer>;
+            USB2SNES_SPACES.SNES
+        );
+    };
+
+    /**
+     * Stop a single memory watcher by its identifier.
+     */
+    const stopWatcher = (watcherId: number): void => {
+        const watcher = watchers.get(watcherId);
+        if (!watcher) {
+            return;
+        }
+
+        watcher.stopped = true;
+        if (watcher.timeoutId) {
+            clearTimeout(watcher.timeoutId);
+            watcher.timeoutId = null;
+        }
+
+        watchers.delete(watcherId);
+    };
+
+    /**
+     * Stop all active memory watchers.
+     */
+    const stopAllWatchers = (): void => {
+        for (const watcherId of watchers.keys()) {
+            stopWatcher(watcherId);
+        }
+    };
+
+    /**
+     * Poll a memory address repeatedly and return the watcher identifier.
+     */
+    const createWatcher = (
+        callback: (data: DataView) => void,
+        address: number,
+        length: number = 1,
+        interval: number = 500,
+    ): number => {
+        const resolvedInterval = Math.max(interval, MIN_WATCH_INTERVAL);
+        const watcherId = nextWatcherId++;
+
+        const watcher: USB2SNESWatcher = {
+            address,
+            length,
+            interval: resolvedInterval,
+            callback,
+            timeoutId: null,
+            stopped: false,
+            running: false,
+        };
+
+        const scheduleNextTick = () => {
+            if (watcher.stopped) {
+                return;
+            }
+
+            watcher.timeoutId = setTimeout(runTick, watcher.interval);
+        };
+
+        const runTick = async () => {
+            if (watcher.stopped || watcher.running) {
+                return;
+            }
+
+            watcher.running = true;
+
+            try {
+                const data = await read(watcher.address, watcher.length);
+                if (!watcher.stopped) {
+                    watcher.callback(data);
+                }
+            } finally {
+                watcher.running = false;
+                scheduleNextTick();
+            }
+        };
+
+        watchers.set(watcherId, watcher);
+        void runTick();
+
+        return watcherId;
+    };
+
+    /**
+     * Bind a memory address to a reactive ref that updates automatically.
+     */
+    const useMemory = (
+        address: number,
+        length: number = 1,
+        options: UseMemoryOptions = {},
+    ) => {
+        const value = ref<DataView | null>(null);
+        const watcherId = ref<number | null>(null);
+        const isWatching = computed(() => watcherId.value !== null);
+        const interval = options.interval ?? 500;
+        const immediate = options.immediate ?? true;
+
+        const stop = () => {
+            if (watcherId.value === null) {
+                return;
+            }
+
+            stopWatcher(watcherId.value);
+            watcherId.value = null;
+        };
+
+        const start = () => {
+            stop();
+            watcherId.value = createWatcher((data: DataView) => {
+                value.value = data;
+            }, address, length, interval);
+        };
+
+        if (immediate) {
+            start();
+        }
+
+        onScopeDispose(() => {
+            stop();
+        });
+
+        return {
+            value,
+            watcherId,
+            isWatching,
+            start,
+            stop,
+            refresh: async () => {
+                const data = await read(address, length);
+                value.value = data;
+                return data;
+            },
+        };
     };
 
     if (options.autoConnect) {
@@ -307,5 +471,9 @@ export function useUSB2SNES(addr: string, options: UseUSB2SNESOptions = {}) {
         send,
         sendImmediate,
         read,
+        useMemory,
+        createWatcher,
+        stopWatcher,
+        stopAllWatchers,
     };
 }
